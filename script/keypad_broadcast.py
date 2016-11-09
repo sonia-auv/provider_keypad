@@ -4,89 +4,55 @@ import numpy
 import roslib
 import math
 
-roslib.load_manifest('proc_navigation')
 import rospy
 
-from nav_msgs.msg import Odometry
-from sensor_msgs.msg import Imu, FluidPressure
-from sonia_msgs.msg import BottomTracking
-
+from provider_keypad.msg import Keypad
 import sys, select, termios, tty
 
 from F130_keypad import *
-import euler_math
 
-
-# maximum speed 2000 mm/s
-MAX_SPEED_LINEAR = 1000.0
-# one 360 / 10 second
-# rad/s
-MAX_SPEED_ANGULAR =  2 * numpy.pi /10.0
-
-# refresh rate 100 Hz
-REFRESH_RATE_SECOND = 1.0/100.0
-
-
-class Teleop:
-    def __init__(self):
-        self.keypad = F130_Keypad()
-        self.position = [0,0,0]
-        self.orientation = [0,0,0]
-
-    def Update(self):
-        # those are mutually exclusive... If you are not on right, you are on left,
-        x_speed = float(self.keypad.states['LJ/Up'] + self.keypad.states['LJ/Down'])
-        y_speed = float(self.keypad.states['LJ/Right'] + self.keypad.states['LJ/Left'])
-        z_speed = float(self.keypad.states['RT'] - self.keypad.states['LT'])
-        yaw_speed = float(self.keypad.states['RJ/Right'] + self.keypad.states['RJ/Left'])
-        # In ENU
-        self.position[1] = ((x_speed / 127.0) * MAX_SPEED_LINEAR)
-        self.position[0] = ((y_speed / 127.0) * MAX_SPEED_LINEAR)
-        self.position[2] += ((z_speed / 254.0) * MAX_SPEED_LINEAR) * REFRESH_RATE_SECOND
-
-        self.orientation[2] += ((yaw_speed / 127.0) * MAX_SPEED_ANGULAR) * REFRESH_RATE_SECOND
+REFRESH_RATE_SECOND = 0.1
 
 if __name__ == "__main__":
-    settings = termios.tcgetattr(sys.stdin)
-    dvl_pub = rospy.Publisher('/provider_dvl/bottom_tracking', BottomTracking, queue_size=100)
-    imu_pub = rospy.Publisher('/provider_imu/imu', Imu, queue_size=100)
-    baro_pub = rospy.Publisher('/provider_can/barometer_fluidpress_msgs', FluidPressure, queue_size=100)
-    rospy.init_node('teleop_keyboard')
-    teleop = Teleop()
+    keypad_publisher = rospy.Publisher('/provider_keypad/Keypad', Keypad, queue_size=100)
+    rospy.init_node('provider_keypad_node')
     time_since_up = 0
+    F130_Keypad = F130_Keypad()
+
     while True:
         time.sleep(REFRESH_RATE_SECOND)
-        teleop.Update()
         time_since_up += REFRESH_RATE_SECOND
 
-        bottom_tracking = BottomTracking()
-        bottom_tracking.velocity[0] = teleop.position[0]
-        bottom_tracking.velocity[1] = teleop.position[1]
-        bottom_tracking.velocity[2] = 0
-        bottom_tracking.time = time_since_up * 1000 *1000
+        # Boutton tracking
+        keypad_msg = Keypad()
+        keypad_msg.A = bool(F130_Keypad.states['A'])
+        keypad_msg.Y = bool(F130_Keypad.states['Y'])
+        keypad_msg.B = bool(F130_Keypad.states['B'])
+        keypad_msg.X = bool(F130_Keypad.states['X'])
+        keypad_msg.Start = bool(F130_Keypad.states['Start'])
+        keypad_msg.Back = bool(F130_Keypad.states['Back'])
+        keypad_msg.Middle = bool(F130_Keypad.states['Middle'])
 
-        pressure = FluidPressure()
-        # Saunder-Fofonoff equation
-        surface_pressure = 101325
-        ge = 9.80
-        rho_water = 1000
-        pressure.fluid_pressure = teleop.position[2] * (rho_water * ge) + surface_pressure
+        keypad_msg.Left = int(F130_Keypad.states['Left'])
+        keypad_msg.Right = int(F130_Keypad.states['Right'])
+        keypad_msg.Up = int(F130_Keypad.states['Up'])
+        keypad_msg.Down = int(F130_Keypad.states['Down'])
 
-        imu = Imu()
-        quaternion = euler_math.euler_to_quat(0, 0, teleop.orientation[2])
-        imu.orientation.x = quaternion[0]
-        imu.orientation.y = quaternion[1]
-        imu.orientation.z = quaternion[2]
-        imu.orientation.w = quaternion[3]
+        keypad_msg.RB = int(F130_Keypad.states['RB'])
+        keypad_msg.RT = int(F130_Keypad.states['RT'])
+        keypad_msg.LB = int(F130_Keypad.states['LB'])
+        keypad_msg.LT = int(F130_Keypad.states['LT'])
 
-        imu_pub.publish(imu)
-        dvl_pub.publish(bottom_tracking)
-        baro_pub.publish(pressure)
+        keypad_msg.RJ_Left = int(F130_Keypad.states['RJ/Left'])
+        keypad_msg.RJ_Right = int(F130_Keypad.states['RJ/Right'])
+        keypad_msg.RJ_Up = int(F130_Keypad.states['RJ/Up'])
+        keypad_msg.RJ_Down = int(F130_Keypad.states['RJ/Down'])
+        keypad_msg.RJ_Button = int(F130_Keypad.states['RJ/Button'])
+        keypad_msg.LJ_Left = int(F130_Keypad.states['LJ/Left'])
+        keypad_msg.LJ_Right = int(F130_Keypad.states['LJ/Right'])
+        keypad_msg.LJ_Up = int(F130_Keypad.states['LJ/Up'])
+        keypad_msg.LJ_Down = int(F130_Keypad.states['LJ/Down'])
+        keypad_msg.LJ_Button = int(F130_Keypad.states['LJ/Button'])
 
-        tty.setraw(sys.stdin.fileno())
-        select.select([sys.stdin], [], [], 0)
-        key = sys.stdin.read(1)
-        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, settings)
-
-        if key == '\x1b' or key == '\x03':
-            exit(0)
+       # Keypad.time = time_since_up * 1000 *1000
+        keypad_publisher.publish(keypad_msg)
