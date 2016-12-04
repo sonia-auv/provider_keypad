@@ -14,8 +14,8 @@ from F130_keypad import *
 REFRESH_RATE_SECOND = 0.1
 
 if __name__ == "__main__":
-    keypad_publisher = rospy.Publisher('/provider_keypad/Keypad', Keypad, queue_size=100)
     rospy.init_node('provider_keypad_node')
+    keypad_publisher = rospy.Publisher('/provider_keypad/Keypad', Keypad, queue_size=100)
     time_since_up = 0
     F130_Keypad = F130_Keypad()
 
@@ -55,4 +55,7 @@ if __name__ == "__main__":
         keypad_msg.LJ_Button = int(F130_Keypad.states['LJ/Button'])
 
        # Keypad.time = time_since_up * 1000 *1000
-        keypad_publisher.publish(keypad_msg)
+        try:
+	    keypad_publisher.publish(keypad_msg)
+	except:
+	    print "exception catched"
