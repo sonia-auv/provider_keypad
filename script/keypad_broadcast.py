@@ -7,7 +7,6 @@ import math
 import rospy
 
 from provider_keypad.msg import Keypad
-import sys, select, termios, tty
 
 from F130_keypad import *
 
@@ -19,7 +18,7 @@ if __name__ == "__main__":
     time_since_up = 0
     F130_Keypad = F130_Keypad()
 
-    while True:
+    while not rospy.is_shutdown():
         time.sleep(REFRESH_RATE_SECOND)
         time_since_up += REFRESH_RATE_SECOND
 
@@ -54,8 +53,8 @@ if __name__ == "__main__":
         keypad_msg.LJ_Down = int(F130_Keypad.states['LJ/Down'])
         keypad_msg.LJ_Button = int(F130_Keypad.states['LJ/Button'])
 
-       # Keypad.time = time_since_up * 1000 *1000
+        # Keypad.time = time_since_up * 1000 *1000
         try:
-	    keypad_publisher.publish(keypad_msg)
-	except:
-	    print "exception catched"
+            keypad_publisher.publish(keypad_msg)
+        except:
+            print "exception catched"
